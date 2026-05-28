@@ -1,0 +1,29 @@
+{
+  "session_slug": "production-readiness-long-running-agents",
+  "requested_outputs": [
+    "output/session-page/index.html",
+    "output/session-page/assets/headshot-square.png",
+    "output/publish-manifest.json",
+    "handoffs/asset-production.md"
+  ],
+  "image_requirements": {
+    "hero_headshot": {
+      "format": "png",
+      "width_px": 800,
+      "height_px": 800,
+      "alt_text": "Priya Shah, speaker for Production Readiness for Long-Running Agents"
+    }
+  },
+  "brand_review": {
+    "current_sponsor": "Northwind Cloud",
+    "retired_markers_to_flag": [
+      "Summit Beta Partner"
+    ]
+  },
+  "accessibility_checks": [
+    "live captions requested",
+    "high-contrast presentation version requested",
+    "image alt text required"
+  ],
+  "publication_state": "requires_review"
+}

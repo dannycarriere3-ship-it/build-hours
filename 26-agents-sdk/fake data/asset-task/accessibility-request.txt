@@ -1,0 +1,9 @@
+From: Priya Shah
+Session: Production Readiness for Long-Running Agents
+
+Please provide live captions for this session. The final presentation deck and
+agenda preview also need a high-contrast version. Avoid text embedded into
+hero imagery unless an equivalent accessible label is supplied.
+
+The headshot may be cropped for the agenda page, but please keep the face and
+shoulders centered. I approve use of the submitted photo for the event site.
