@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ session_title }} | Summit 2026</title>
+    <style>
+      :root { --paper: #faf4ed; --ink: #575279; --accent: #d7827e; }
+      body { margin: 0; font: 16px Inter, Arial, sans-serif; color: var(--ink); background: var(--paper); }
+      main { max-width: 920px; margin: 64px auto; display: grid; grid-template-columns: 1fr 240px; gap: 48px; }
+      .track { color: var(--accent); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+      h1 { font-size: 48px; line-height: 1.1; margin: 12px 0 20px; }
+      img { border-radius: 20px; width: 240px; height: 240px; object-fit: cover; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <p class="track">{{ track_name }}</p>
+        <h1>{{ session_title }}</h1>
+        <p>{{ public_abstract }}</p>
+        <section>{{ speaker_bio }}</section>
+        <p>{{ accessibility_note }}</p>
+      </article>
+      <aside>
+        <img src="{{ headshot_path }}" alt="{{ headshot_alt }}">
+        <p>Priya Shah<br>Juniper Ridge Systems</p>
+      </aside>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,2 @@
+server: uv run --frozen uvicorn app.main:app --reload --timeout-graceful-shutdown 1 --host 127.0.0.1 --port 8421
+client: npm --prefix web run dev -- --host 127.0.0.1
