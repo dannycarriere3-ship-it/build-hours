@@ -11,6 +11,7 @@ export interface SupplyRealtimeDebugEntry {
   ts: string;
   direction: SupplyRealtimeDebugDirection;
   type: string;
+  eventId?: string;
   note?: string;
   responseId?: string;
   itemId?: string;
@@ -86,6 +87,7 @@ export function createSupplyRealtimeDebugEntry(
     ts: new Date().toISOString(),
     direction,
     type: stringValue(record.type) ?? metadata.note ?? 'unknown',
+    eventId: stringValue(record.event_id),
     ...metadata,
     responseId: stringValue(response?.id) ?? stringValue(record.response_id),
     itemId: stringValue(record.item_id) ?? stringValue(item?.id),

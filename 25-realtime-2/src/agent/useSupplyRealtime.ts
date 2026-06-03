@@ -15,6 +15,7 @@ import {
 import {
   SUPPLY_REALTIME_MODEL,
   SUPPLY_REALTIME_REASONING,
+  SUPPLY_REALTIME_TURN_DETECTION,
 } from './supplyRealtimeConfig';
 import {
   installSupplyRealtimeDebugHelpers,
@@ -62,6 +63,7 @@ interface PendingFunctionCall {
 
 interface ServerEvent {
   type?: string;
+  event_id?: string;
   item_id?: string;
   delta?: string;
   transcript?: string;
@@ -99,7 +101,9 @@ interface ServerEvent {
     };
   };
   error?: {
+    code?: string;
     message?: string;
+    type?: string;
   };
   item?: {
     id?: string;
@@ -117,6 +121,10 @@ interface ServerEvent {
 
 function createMessageId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getActiveResponseIdFromError(message: string | undefined) {
+  return message?.match(/active response in progress:\s*(resp_[A-Za-z0-9]+)/i)?.[1];
 }
 
 function cloneActivityTrace(trace: SupplyActivityTrace): SupplyActivityTrace {
@@ -313,7 +321,10 @@ export function useSupplyRealtime() {
   }, []);
 
   const sendResponseCreate = useCallback(() => {
-    const sent = sendClientEvent({ type: 'response.create' });
+    const sent = sendClientEvent({
+      event_id: createMessageId('supply-response-create'),
+      type: 'response.create',
+    });
     if (!sent) {
       logSupplyRealtimeEvent('internal', { type: 'supply.response_create_failed' });
       responseGateRef.current.markResponseRequestFailed();
@@ -713,7 +724,7 @@ export function useSupplyRealtime() {
       }
 
       if (event.type === 'response.created') {
-        responseGateRef.current.markResponseCreated();
+        responseGateRef.current.markResponseCreated(event.response?.id);
         setStatus('speaking');
         activeAssistantMessageIdRef.current = null;
         return;
@@ -784,7 +795,12 @@ export function useSupplyRealtime() {
           prepareNewTurn();
         }
         audioTurnPreparedRef.current = false;
-        completePendingAudioUserMessage(event.transcript ?? '');
+        const transcript = event.transcript ?? '';
+        completePendingAudioUserMessage(transcript);
+        if (transcript.trim()) {
+          const sent = requestResponseForUserTurn();
+          if (sent) setStatus('speaking');
+        }
         return;
       }
 
@@ -824,7 +840,7 @@ export function useSupplyRealtime() {
           sessionKey: supplySessionIdRef.current,
           usage: event.response?.usage,
         });
-        const pendingResponse = responseGateRef.current.markResponseDone();
+        const pendingResponse = responseGateRef.current.markResponseDone(event.response?.id);
         logSupplyRealtimeEvent('internal', {
           type: 'supply.response_done_gate',
           response_id: event.response?.id,
@@ -841,9 +857,22 @@ export function useSupplyRealtime() {
       }
 
       if (event.type === 'error') {
+        const errorMessage = event.error?.message ?? 'The assistant had trouble responding.';
+        const activeResponseId = getActiveResponseIdFromError(errorMessage);
+        if (activeResponseId) {
+          responseGateRef.current.markResponseCreated(activeResponseId);
+          setStatus('speaking');
+          logSupplyRealtimeEvent('internal', {
+            type: 'supply.active_response_error_resynced',
+            response_id: activeResponseId,
+            event_id: event.event_id,
+          });
+          return;
+        }
+
         responseGateRef.current.markResponseRequestFailed();
         setStatus('error');
-        setTraceErrorText(event.error?.message ?? 'The assistant had trouble responding.');
+        setTraceErrorText(errorMessage);
       }
     },
     [
@@ -851,6 +880,7 @@ export function useSupplyRealtime() {
       completePendingAudioUserMessage,
       prepareNewTurn,
       runFunctionCall,
+      requestResponseForUserTurn,
       sendResponseCreate,
       setTraceErrorText,
       setTracePreambleText,
@@ -872,12 +902,7 @@ export function useSupplyRealtime() {
         reasoning: SUPPLY_REALTIME_REASONING,
         instructions: SUPPLY_REALTIME_INSTRUCTIONS,
         tools: SUPPLY_REALTIME_TOOLS,
-        turnDetection: {
-          type: 'semantic_vad',
-          eagerness: 'high',
-          interrupt_response: false,
-          create_response: true,
-        },
+        turnDetection: SUPPLY_REALTIME_TURN_DETECTION,
       }),
     });
   }, [sendClientEvent]);

@@ -80,6 +80,7 @@ interface ServerEvent {
     };
   };
   response?: {
+    id?: string;
     usage?: {
       total_tokens?: number;
       input_tokens?: number;
@@ -850,7 +851,7 @@ export function useMetricLoopRealtime() {
       }
 
       if (event.type === 'response.created') {
-        responseControllerRef.current.markResponseCreated();
+        responseControllerRef.current.markResponseCreated(event.response?.id);
         setStatus('speaking');
         activeAssistantMessageIdRef.current = null;
         addDeveloperEvent({ type: 'response.created', label: 'Response started' });
@@ -980,7 +981,7 @@ export function useMetricLoopRealtime() {
         });
         setStatus('listening');
         addDeveloperEvent({ type: 'response.done', label: 'Response completed' });
-        const didRequest = requestControlledResponse(responseControllerRef.current.markResponseDone());
+        const didRequest = requestControlledResponse(responseControllerRef.current.markResponseDone(event.response?.id));
         if (didRequest) setStatus('speaking');
         return;
       }

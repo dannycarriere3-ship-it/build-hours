@@ -26,6 +26,7 @@ export function createRealtimeResponseController(): RealtimeResponseController {
   let waitingForTranscript = false;
   let responseRequested = false;
   let responseActive = false;
+  let activeResponseId: string | null = null;
   const activeToolCallIds = new Set<string>();
   let anonymousToolCallCount = 0;
   let continuationPending = false;
@@ -95,17 +96,25 @@ export function createRealtimeResponseController(): RealtimeResponseController {
       if (!trimmedText) return noResponse;
       return requestResponse('typed', trimmedText);
     },
-    markResponseCreated() {
+    markResponseCreated(responseId?: string) {
       responseRequested = true;
       responseActive = true;
+      activeResponseId = responseId ?? null;
     },
     markResponseRequestFailed() {
       responseRequested = false;
-      responseActive = false;
+      if (!responseActive) {
+        activeResponseId = null;
+      }
     },
-    markResponseDone() {
+    markResponseDone(responseId?: string) {
+      if (responseActive && activeResponseId && responseId && responseId !== activeResponseId) {
+        return noResponse;
+      }
+
       responseRequested = false;
       responseActive = false;
+      activeResponseId = null;
       return drainPendingResponse();
     },
     beginToolCall(callId?: string) {
@@ -136,6 +145,7 @@ export function createRealtimeResponseController(): RealtimeResponseController {
       waitingForTranscript = false;
       responseRequested = false;
       responseActive = false;
+      activeResponseId = null;
       activeToolCallIds.clear();
       anonymousToolCallCount = 0;
       continuationPending = false;

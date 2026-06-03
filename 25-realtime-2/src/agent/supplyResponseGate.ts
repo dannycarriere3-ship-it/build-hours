@@ -8,9 +8,9 @@ export interface SupplyResponseGateDrain {
 }
 
 export interface SupplyResponseGate {
-  markResponseCreated(): void;
+  markResponseCreated(responseId?: string): void;
   markResponseRequestFailed(): void;
-  markResponseDone(): SupplyResponseGateDrain;
+  markResponseDone(responseId?: string): SupplyResponseGateDrain;
   markToolCallStarted(callId?: string): void;
   markToolCallFinished(callId?: string): void;
   requestResponseForToolOutput(callId?: string): boolean;
@@ -30,14 +30,14 @@ export function createSupplyResponseGate(): SupplyResponseGate {
   const controller = createRealtimeResponseController();
 
   return {
-    markResponseCreated() {
-      controller.markResponseCreated();
+    markResponseCreated(responseId?: string) {
+      controller.markResponseCreated(responseId);
     },
     markResponseRequestFailed() {
       controller.markResponseRequestFailed();
     },
-    markResponseDone() {
-      return toSupplyDrain(controller.markResponseDone());
+    markResponseDone(responseId?: string) {
+      return toSupplyDrain(controller.markResponseDone(responseId));
     },
     markToolCallStarted(callId?: string) {
       controller.beginToolCall(callId);

@@ -2,6 +2,7 @@ export const REALTIME_TRANSCRIPTION_MODEL = 'gpt-realtime-whisper';
 export const REALTIME_OUTPUT_VOICE = 'marin';
 
 export type RealtimeReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type RealtimeVadEagerness = 'low' | 'medium' | 'high' | 'auto';
 
 export interface RealtimeAssistantConfig {
   model: string;
@@ -13,7 +14,7 @@ export interface RealtimeAssistantConfig {
 
 export interface RealtimeTurnDetectionConfig {
   type: 'semantic_vad';
-  eagerness: 'high';
+  eagerness: RealtimeVadEagerness;
   interrupt_response: boolean;
   create_response: boolean;
 }
