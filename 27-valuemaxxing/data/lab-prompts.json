@@ -1,0 +1,19 @@
+{
+  "visualArtifact": {
+    "instructions": "Create one self-contained visual artifact from the user's brief.\n\nIf the brief asks for an SVG, return one complete <svg> element and nothing else.\nOtherwise, return one complete HTML document and nothing else.\n\nRequirements:\n- Make the result immediately legible as a small preview and at full size.\n- Use only inline HTML, CSS, SVG, canvas, and vanilla JavaScript.\n- Do not use external assets, network requests, packages, fonts, or imports.\n- Prefer a working interaction over explanatory prose.\n- Add only the controls the brief needs. Keep labels concise.\n- Respect prefers-reduced-motion when animation is present.\n- Include accessible labels and sufficient contrast.\n- Put all CSS and JavaScript inside the document.\n- Do not wrap the document in Markdown fences."
+  },
+  "promptCaching": {
+    "systemTemplate": "You are an account analyst. Use only the synthetic account ledger below.\nReturn concise Markdown with account IDs and one sentence of evidence for each conclusion.\nDo not infer facts that are absent from the ledger.\n\nSYNTHETIC ACCOUNT LEDGER\n{{ACCOUNT_LEDGER}}\n\nANALYSIS RULES\n1. Separate observations from recommendations.\n2. Prefer specific behavioral evidence over a generic health score.\n3. Quote no more than one ledger phrase per account.\n4. Keep the final answer below 180 words.\n5. This dataset is a local demonstration fixture, not customer data.",
+    "primingQuestion": "Which three accounts show the strongest activation momentum?",
+    "comparisonQuestion": "Which five accounts deserve a retention intervention first? Rank them by observable risk and cite the account IDs."
+  },
+  "programmaticToolCalling": {
+    "task": "Find every west-region account with usage growth above 30% and at least one open P1 support case. Return a compact Markdown table with account, growth, P1 count, and oldest case age. Do not omit qualifying accounts.",
+    "directInstructions": "Use the supplied tools to answer exactly. Gather every candidate before filtering and issue independent lookups in parallel. Keep the final answer concise.",
+    "programmaticInstructions": "Use programmatic tool calling and write one JavaScript program for the entire task. After listing accounts, use Promise.all to call get_usage and get_support for every candidate in parallel, filter inside the program, and emit only the compact qualifying rows for the final answer. Do not write a second program."
+  },
+  "contextCompaction": {
+    "developerInstructions": "You own an ongoing production-launch incident handoff. Preserve launch identifiers, severity, ownership, blockers, and recovery tokens from all earlier shifts. The only priority-zero blocked launch is the highest-priority incident. Answer follow-up questions using the complete handoff history, not only the latest shift.",
+    "followUpQuestion": "Find the highest-priority blocked launch in the complete shift history. Return exactly one JSON object with launch_id, owner, blocker, and recovery_token. Use the original exact values."
+  }
+}
