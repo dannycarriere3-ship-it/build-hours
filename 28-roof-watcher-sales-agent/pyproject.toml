@@ -1,0 +1,19 @@
+[project]
+name = "roof-watcher-sales-agent"
+version = "0.1.0"
+description = "Roof Watcher commercial roofing sales agent for Carriere Roofing (Edmonton, AB)."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["roof_watcher"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
