@@ -10,6 +10,8 @@ system.
 
 from __future__ import annotations
 
+import re
+
 from roof_watcher import tools
 from roof_watcher.config import (
     ADDRESS_CLARIFICATION,
@@ -32,6 +34,16 @@ _LEAK_DETAILS_QUESTION = (
     "Where is the leak showing up, and is it actively leaking right now?"
 )
 
+# A post-booking message that merely happens to look address-shaped (e.g.
+# a callback time, a property count) is NOT a correction on its own --
+# only treat it as one when the customer signals they're correcting
+# something.
+_CORRECTION_CUE_RE = re.compile(
+    r"\b(wrong|actually|correct(ion)?|change|instead|meant|new) "
+    r"(the )?(address|it'?s|location)?",
+    re.I,
+)
+
 # Intents whose canned answer already ends in its own single question, so
 # we don't stack a second qualification question in the same reply.
 _SELF_CONTAINED_INTENTS = {"pricing_question", "repair_cost_question"}
@@ -50,11 +62,26 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
     if state.escalation.escalated:
         return _escalated_reply()
 
+    # Consumed exactly once, every turn: awaiting_booking_confirm is only
+    # true for the ONE reply immediately after the agent asks "Would you
+    # like to book the inspection?" Reading it into a local and clearing
+    # the state flag unconditionally here means any other answer (e.g.
+    # describing the issue) can't leave it stuck true, which used to let a
+    # later unrelated "yes" (answering some other pending question) get
+    # hijacked into the address ask.
+    pending_booking_confirm = state.qualification.awaiting_booking_confirm
+    state.qualification.awaiting_booking_confirm = False
+
     if state.booking.requested:
         # A new address volunteered post-booking is a correction, not an
         # answer to a pending question -- handle it before falling back to
-        # the generic "you're already booked" reply.
-        if cls.address_like is not None:
+        # the generic "you're already booked" reply. Requires an explicit
+        # correction cue ("actually", "wrong", "change", ...): the address
+        # heuristic alone matches plenty of post-booking chatter that
+        # isn't a correction at all (a callback time, a property count),
+        # and blindly overwriting the address on any address-shaped text
+        # would corrupt a correct booking and log a bogus correction.
+        if cls.address_like is not None and _CORRECTION_CUE_RE.search(text):
             return _handle_address_correction(state, sink, cls.address_like)
         return _booked_reply(state)
 
@@ -100,8 +127,7 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
     # must still be checked BEFORE counting toward the rule-4
     # slipping-away streak — genuinely agreeing to book is the opposite of
     # disengagement.
-    if cls.intent == "booking_affirm" and state.qualification.awaiting_booking_confirm:
-        state.qualification.awaiting_booking_confirm = False
+    if cls.intent == "booking_affirm" and pending_booking_confirm:
         state.escalation.low_engagement_streak = 0
         if state.qualification.address is None:
             state.qualification.awaiting_address = True

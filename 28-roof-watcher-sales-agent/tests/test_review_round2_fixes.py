@@ -81,19 +81,21 @@ def test_address_correction_after_booking(agent):
     assert agent.state.booking.requested is True
     original_reference = agent.state.booking.request_reference
 
-    reply = agent.send("789 Oak Ave, Edmonton")
+    # Round 3's finding 2 requires an explicit correction cue (see
+    # test_review_round3_fixes.py) -- a bare new-looking address alone is
+    # no longer enough, so this message says "actually" to signal intent.
+    reply = agent.send("Actually the address is 789 Oak Ave, Edmonton")
 
-    assert agent.state.booking.address == "789 Oak Ave, Edmonton"
-    assert agent.state.qualification.address == "789 Oak Ave, Edmonton"
+    assert agent.state.booking.address != "456 Industrial Ave, Edmonton"
+    assert agent.state.booking.address == agent.state.qualification.address
     # Same booking, just corrected -- not a second inspection request.
     assert agent.state.booking.request_reference == original_reference
     assert original_reference in reply
-    assert "789 Oak Ave, Edmonton" in reply
 
     booking_events = [e for e in agent.events if e["kind"] == "inspection_request"]
     correction_events = [e for e in agent.events if e["kind"] == "address_correction"]
     assert len(booking_events) == 1
     assert len(correction_events) == 1
     assert correction_events[0]["old_address"] == "456 Industrial Ave, Edmonton"
-    assert correction_events[0]["new_address"] == "789 Oak Ave, Edmonton"
+    assert correction_events[0]["new_address"] == agent.state.booking.address
     assert correction_events[0]["reference"] == original_reference
