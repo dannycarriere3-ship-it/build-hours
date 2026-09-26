@@ -28,8 +28,8 @@ def test_rule_3_repeated_call_you_back(agent):
 
 def test_rule_4_customer_slipping_away(agent):
     agent.send("Hi.")
-    agent.send("ok")
-    agent.send("sure")
+    agent.send("hmm")
+    agent.send("meh")
     reply = agent.send("whatever")
     assert agent.state.escalation.triggered_rule == 4
     assert agent.state.escalation.escalated is True
@@ -69,6 +69,24 @@ def test_single_call_back_does_not_escalate_yet(agent):
 
 def test_two_low_engagement_replies_alone_do_not_escalate(agent):
     agent.send("Hi.")
-    agent.send("ok")
-    reply = agent.send("sure")
+    agent.send("hmm")
+    reply = agent.send("meh")
     assert agent.state.escalation.escalated is False
+
+
+# --- Regression test for Gitar Bot finding 3 ------------------------------
+# "ok"/"sure"/"fine" match both the low-engagement wordlist and the
+# booking-affirmation wordlist. Agreeing to book must never be miscounted
+# as disengagement and must never trigger the rule-4 escalation.
+def test_booking_affirm_never_counts_as_low_engagement_or_escalates(agent):
+    agent.send("What do you charge?")
+    reply1 = agent.send("ok")
+    reply2 = agent.send("sure")
+    reply3 = agent.send("ok")
+    assert agent.state.escalation.escalated is False
+    assert agent.state.escalation.low_engagement_streak == 0
+    # Each affirmation should have been treated as "yes, let's move
+    # forward" -- i.e. it should push toward the address ask, not repeat
+    # a generic question or silently do nothing.
+    for reply in (reply1, reply2, reply3):
+        assert "address" in reply.lower() or "building" in reply.lower()

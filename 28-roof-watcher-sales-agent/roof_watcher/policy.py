@@ -46,11 +46,6 @@ def handle_message(state: ConversationState, sink: EventSink, text: str) -> str:
 def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
     cls = classify(text)
 
-    if cls.low_engagement:
-        state.escalation.low_engagement_streak += 1
-    else:
-        state.escalation.low_engagement_streak = 0
-
     if state.escalation.escalated:
         return _escalated_reply()
 
@@ -85,9 +80,28 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
         state.stage = Stage.OBJECTION
         return THINK_ABOUT_IT_PROMPT
 
+    # "ok"/"sure"/"fine" etc. are ambiguous: they match both the
+    # low-engagement wordlist and the booking-affirmation wordlist. When
+    # the customer is actually agreeing to book, that's the opposite of
+    # disengagement, so this must be checked BEFORE counting toward the
+    # rule-4 slipping-away streak — otherwise agreeing to book falsely
+    # escalates the conversation instead of moving it to the address ask.
+    if cls.intent == "booking_affirm":
+        state.escalation.low_engagement_streak = 0
+        if state.qualification.address is None:
+            state.qualification.awaiting_address = True
+            return PRIMARY_CTA
+        return _pipeline(state, sink, text, cls)
+
     # ---- Escalation rule 4: customer is clearly slipping away — three or
     # more non-committal, disengaged replies in a row with no forward
-    # progress on qualification or booking.
+    # progress on qualification or booking. Only counted when no question
+    # is pending that the reply could instead be answering.
+    if cls.low_engagement:
+        state.escalation.low_engagement_streak += 1
+    else:
+        state.escalation.low_engagement_streak = 0
+
     if cls.low_engagement and state.escalation.low_engagement_streak >= 3:
         return _escalate(
             state,
@@ -260,14 +274,20 @@ def _extract_qualification(
 
     # Opportunistic capture: a customer can volunteer these facts before
     # we've asked, e.g. "I've got 3 buildings" unprompted.
+    #
+    # Address is deliberately NOT captured opportunistically: the address
+    # heuristic is a loose "number + word + common-word street suffix"
+    # match (e.g. "close", "park", "way") that also matches ordinary prose
+    # like "water is pooling close to the drain". An address is only ever
+    # accepted once we've actually asked for it (awaiting_address, above),
+    # so a customer describing their problem can never get accidentally
+    # booked against a sentence fragment mistaken for a street address.
     if cls.is_leaking is not None and q.is_leaking is None:
         q.is_leaking = cls.is_leaking
     if cls.is_multiple is not None and q.is_multiple_properties is None:
         q.is_multiple_properties = cls.is_multiple
     if cls.role is not None and q.role is None:
         q.role = cls.role
-    if cls.address_like is not None and q.address is None:
-        q.address = cls.address_like
 
 
 def _do_booking(state: ConversationState, sink: EventSink) -> str:

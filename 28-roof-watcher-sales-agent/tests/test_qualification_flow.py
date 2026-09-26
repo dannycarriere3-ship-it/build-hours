@@ -46,6 +46,27 @@ def test_pricing_question_short_circuits_straight_to_property_count(agent):
     assert "roof" in r2.lower()  # falls back to asking what's happening
 
 
+# --- Regression test for Gitar Bot finding 1 ------------------------------
+# The address heuristic (digit + word + common street-suffix word like
+# "close"/"park"/"way") can match ordinary descriptive prose. Such text
+# must never be silently captured as the address and used to book an
+# inspection before the agent has actually asked for the address.
+def test_address_heuristic_never_books_from_opportunistic_description(agent):
+    r1 = agent.send("Hi there")
+    assert "roof" in r1.lower()
+
+    r2 = agent.send("There's 2 inches of standing water close to the vent.")
+    assert agent.state.qualification.address is None
+    assert agent.state.booking.requested is False
+    assert agent.state.stage != Stage.BOOKED
+    # The message should still be used (as the issue description) and the
+    # conversation should keep qualifying, not go silent.
+    assert agent.state.qualification.issue_description == (
+        "There's 2 inches of standing water close to the vent."
+    )
+    assert r2.strip() != ""
+
+
 def test_agent_never_asks_two_questions_in_one_turn(agent):
     agent.send("Hi there")
     for msg in [

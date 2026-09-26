@@ -34,3 +34,15 @@ def test_leak_reported_mid_conversation_after_pricing_question(agent):
     r2 = agent.send("Actually it's leaking right now, one property.")
     assert agent.state.qualification.is_leaking is True
     assert "where" in r2.lower()
+
+
+# --- Regression test for Gitar Bot finding 2 -------------------------------
+# The negative-leak pattern used to match a bare "no" anywhere in the
+# message, so a report that merely contains the word "no" elsewhere in the
+# sentence (not as a negation of the leak) would wrongly flip is_leaking to
+# False and skip the urgent leak path entirely.
+def test_bare_no_elsewhere_in_sentence_does_not_cancel_an_active_leak(agent):
+    reply = agent.send("My roof is leaking and I have no idea why.")
+    assert agent.state.qualification.is_leaking is True
+    assert "where" in reply.lower()
+    assert "actively leaking" in reply.lower()

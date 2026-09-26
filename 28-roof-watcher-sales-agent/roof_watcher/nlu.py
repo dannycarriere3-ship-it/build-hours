@@ -45,7 +45,9 @@ _ACTIVE_LEAK_YES_RE = re.compile(
     r"\b(yes|yeah|yep|right now|currently|still|actively)\b", re.I
 )
 _ACTIVE_LEAK_NO_RE = re.compile(
-    r"\b(no|not right now|not currently|stopped|it stopped|dried up)\b", re.I
+    r"^\s*no\b|\b(not (leaking|right now|currently)|no (active )?leaks?|"
+    r"no longer|stopped|dried up)\b",
+    re.I,
 )
 
 _THINK_ABOUT_IT_RE = re.compile(

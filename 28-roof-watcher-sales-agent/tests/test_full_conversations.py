@@ -30,6 +30,8 @@ def test_pricing_question_reaches_booking():
     a = _run(
         "What do you charge?",
         "two properties",
+        "Some wear on the membrane, nothing urgent.",
+        "No, it's not leaking.",
         "I manage them for the owner",
         "17 Warehouse Row, Edmonton",
     )

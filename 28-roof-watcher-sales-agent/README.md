@@ -158,7 +158,7 @@ python3 -m pip install -e ".[dev]"
 pytest -q
 ```
 
-43 tests, one file per major conversation path:
+46 tests, one file per major conversation path:
 
 | File | Covers |
 |---|---|
@@ -174,7 +174,7 @@ pytest -q
 ### Run results
 
 ```
-43 passed in 0.04s
+46 passed in 0.06s
 ```
 
 All tests pass. Nothing is currently failing or skipped.
