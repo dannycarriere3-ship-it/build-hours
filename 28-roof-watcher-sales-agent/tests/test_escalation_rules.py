@@ -74,19 +74,22 @@ def test_two_low_engagement_replies_alone_do_not_escalate(agent):
     assert agent.state.escalation.escalated is False
 
 
-# --- Regression test for Gitar Bot finding 3 ------------------------------
+# --- Regression test for Gitar Bot finding 3 (refined by review round 2,
+# bug 1) ---------------------------------------------------------------
 # "ok"/"sure"/"fine" match both the low-engagement wordlist and the
-# booking-affirmation wordlist. Agreeing to book must never be miscounted
-# as disengagement and must never trigger the rule-4 escalation.
-def test_booking_affirm_never_counts_as_low_engagement_or_escalates(agent):
-    agent.send("What do you charge?")
-    reply1 = agent.send("ok")
-    reply2 = agent.send("sure")
-    reply3 = agent.send("ok")
+# booking-affirmation wordlist. Right after the agent asks "Would you like
+# to book the inspection?" (the repair-cost follow-up), such a reply is
+# unambiguously an agreement to book and must never be miscounted as
+# disengagement or trigger the rule-4 escalation. (Round 2's bug 1 fix
+# narrowed this to ONLY that specific pending question -- "ok"/"sure" with
+# no such question pending correctly falls through to low-engagement
+# counting instead, since it could just as easily be answering some other
+# pending qualification question; see test_review_round2_fixes.py.)
+def test_booking_confirm_after_repair_cost_question_does_not_escalate(agent):
+    agent.send("How much will the repair cost?")
+
+    reply = agent.send("ok")
+
     assert agent.state.escalation.escalated is False
     assert agent.state.escalation.low_engagement_streak == 0
-    # Each affirmation should have been treated as "yes, let's move
-    # forward" -- i.e. it should push toward the address ask, not repeat
-    # a generic question or silently do nothing.
-    for reply in (reply1, reply2, reply3):
-        assert "address" in reply.lower() or "building" in reply.lower()
+    assert "address" in reply.lower() or "building" in reply.lower()

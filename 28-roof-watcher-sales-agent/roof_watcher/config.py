@@ -68,6 +68,11 @@ EXPERIENCE_ANSWER = (
     f"{COMPANY_NAME} has {COMPANY_EXPERIENCE}, based in {COMPANY_CITY}."
 )
 
+ADDRESS_CLARIFICATION = (
+    "I need the building's street address to book the inspection — "
+    "what is the street address?"
+)
+
 THINK_ABOUT_IT_PROMPT = "Absolutely. What part are you unsure about?"
 
 CALL_BACK_PROMPT = (
