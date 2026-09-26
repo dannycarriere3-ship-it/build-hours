@@ -50,6 +50,12 @@ class QualificationState:
     awaiting_is_multiple: bool = False
     awaiting_role: bool = False
     awaiting_address: bool = False
+    # True only on the turn right after the agent asked "Would you like to
+    # book the inspection?" (the repair-cost follow-up). This is what lets
+    # a bare "yes" be told apart from "yes" answering some other pending
+    # yes/no qualification question (e.g. "Is it leaking right now?") --
+    # only in this state does "yes" mean "go to the address ask".
+    awaiting_booking_confirm: bool = False
 
     def is_complete(self) -> bool:
         return self.address is not None

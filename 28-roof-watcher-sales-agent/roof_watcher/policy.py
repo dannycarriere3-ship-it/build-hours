@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from roof_watcher import tools
 from roof_watcher.config import (
+    ADDRESS_CLARIFICATION,
     CALL_BACK_PROMPT,
     COMPANY_PHONE,
     ESCALATION_CONTACT_NAME,
@@ -50,15 +51,17 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
         return _escalated_reply()
 
     if state.booking.requested:
+        # A new address volunteered post-booking is a correction, not an
+        # answer to a pending question -- handle it before falling back to
+        # the generic "you're already booked" reply.
+        if cls.address_like is not None:
+            return _handle_address_correction(state, sink, cls.address_like)
         return _booked_reply(state)
 
-    if state.escalation.awaiting_objection_explanation:
-        return _handle_objection_followup(state, sink, text, cls)
-
-    if state.escalation.awaiting_callback_reason:
-        return _handle_callback_followup(state, sink, text, cls)
-
-    # ---- Escalation rule 2: custom pricing / payment plan request.
+    # ---- Escalation rule 2: custom pricing / payment plan request. Checked
+    # before the objection/callback follow-up branches below so a
+    # custom-pricing ask always escalates, even mid-objection (e.g. while
+    # answering "What part are you unsure about?").
     if cls.intent == "custom_pricing_request":
         return _escalate(
             state,
@@ -66,6 +69,12 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
             rule=2,
             reason="Customer asked for custom pricing or a payment plan.",
         )
+
+    if state.escalation.awaiting_objection_explanation:
+        return _handle_objection_followup(state, sink, text, cls)
+
+    if state.escalation.awaiting_callback_reason:
+        return _handle_callback_followup(state, sink, text, cls)
 
     # ---- Escalation rule 3, step 1: "I'll call you back."
     if cls.intent == "call_back":
@@ -81,12 +90,18 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
         return THINK_ABOUT_IT_PROMPT
 
     # "ok"/"sure"/"fine" etc. are ambiguous: they match both the
-    # low-engagement wordlist and the booking-affirmation wordlist. When
-    # the customer is actually agreeing to book, that's the opposite of
-    # disengagement, so this must be checked BEFORE counting toward the
-    # rule-4 slipping-away streak — otherwise agreeing to book falsely
-    # escalates the conversation instead of moving it to the address ask.
-    if cls.intent == "booking_affirm":
+    # low-engagement wordlist and the booking-affirmation wordlist, AND a
+    # bare "yes"/"sure" is also the natural answer to other pending
+    # yes/no qualification questions (e.g. "Is it leaking right now?",
+    # "...is it actively leaking right now?"). Only treat it as "yes, book
+    # it" when we actually just asked "Would you like to book the
+    # inspection?" (awaiting_booking_confirm) -- otherwise fall through so
+    # it's consumed as the answer to whatever question IS pending. This
+    # must still be checked BEFORE counting toward the rule-4
+    # slipping-away streak — genuinely agreeing to book is the opposite of
+    # disengagement.
+    if cls.intent == "booking_affirm" and state.qualification.awaiting_booking_confirm:
+        state.qualification.awaiting_booking_confirm = False
         state.escalation.low_engagement_streak = 0
         if state.qualification.address is None:
             state.qualification.awaiting_address = True
@@ -161,8 +176,30 @@ def _handle_callback_followup(
 def _pipeline(
     state: ConversationState, sink: EventSink, text: str, cls: Classification
 ) -> str:
+    was_awaiting_address = state.qualification.awaiting_address
+    is_directed_answer = cls.intent not in _DEFLECTING_INTENTS
+
     _extract_qualification(state, cls, text)
     state.stage = Stage.QUALIFYING if state.stage == Stage.GREETING else state.stage
+
+    # This is the turn the agent asks "Would you like to book the
+    # inspection?" -- remember it so a later bare "yes" is unambiguously
+    # a booking confirmation and not an answer to some other question.
+    if cls.intent == "repair_cost_question":
+        state.qualification.awaiting_booking_confirm = True
+
+    # We asked for the address, got a real (non-deflecting) answer, and it
+    # still didn't parse as an address -- never book against garbage;
+    # re-ask instead of silently falling through to a generic follow-up.
+    # awaiting_address is untouched by a failed extraction, so it's still
+    # True here and stays True for the next reply.
+    if (
+        was_awaiting_address
+        and state.qualification.address is None
+        and is_directed_answer
+        and text.strip()
+    ):
+        return ADDRESS_CLARIFICATION
 
     answer = _answer_for_intent(cls)
 
@@ -265,11 +302,13 @@ def _extract_qualification(
             q.awaiting_role = False
 
     if q.awaiting_address and is_directed_answer and q.address is None:
+        # Only a regex-validated address is accepted here -- a "contains a
+        # digit" fallback would book against garbage like "call me at
+        # 780-555-0100" or "I don't know, maybe unit 4?". If this doesn't
+        # match, awaiting_address stays True and _pipeline re-asks instead
+        # of booking.
         if cls.address_like is not None:
             q.address = cls.address_like
-        elif any(ch.isdigit() for ch in text):
-            q.address = text
-        if q.address is not None:
             q.awaiting_address = False
 
     # Opportunistic capture: a customer can volunteer these facts before
@@ -301,6 +340,20 @@ def _do_booking(state: ConversationState, sink: EventSink) -> str:
         f"Got it — inspection request logged for {address} "
         f"(ref: {receipt['reference']}). Someone from Carriere Roofing will "
         "call to confirm timing. Anything else?"
+    )
+
+
+def _handle_address_correction(
+    state: ConversationState, sink: EventSink, new_address: str
+) -> str:
+    old_address = state.booking.address
+    reference = state.booking.request_reference
+    tools.correct_booking_address(sink, reference, old_address, new_address)
+    state.booking.address = new_address
+    state.qualification.address = new_address
+    return (
+        f"Updated — inspection {reference} is now logged for {new_address}. "
+        "Anything else?"
     )
 
 

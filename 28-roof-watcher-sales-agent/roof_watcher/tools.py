@@ -88,6 +88,25 @@ def escalate_to_danny(sink: EventSink, reason: str, rule: int) -> dict:
     return payload
 
 
+def correct_booking_address(
+    sink: EventSink, reference: str, old_address: str | None, new_address: str
+) -> dict:
+    """Log a simulated address correction on an already-logged request.
+
+    Does NOT touch a real calendar/CRM record; it's a local log entry a
+    real integration would replay against whatever system actually holds
+    the inspection request.
+    """
+    payload = {
+        "reference": reference,
+        "old_address": old_address,
+        "new_address": new_address,
+        "corrected_at": _now(),
+    }
+    sink.record("address_correction", payload)
+    return payload
+
+
 def get_pricing_snapshot() -> dict:
     """Read-only lookup of the real, static pricing config (not a network
     call — just exposed as a tool for symmetry with the other two, and so
