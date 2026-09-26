@@ -158,7 +158,7 @@ python3 -m pip install -e ".[dev]"
 pytest -q
 ```
 
-51 tests, one file per major conversation path:
+54 tests, one file per major conversation path:
 
 | File | Covers |
 |---|---|
@@ -171,11 +171,12 @@ pytest -q
 | `test_booking_simulated.py` | No fake confirmed time, real reference format, no re-booking, no fake "Danny reached" claim |
 | `test_full_conversations.py` | End-to-end: leak / pricing / maintenance question / general inquiry, each reaching BOOKED |
 | `test_review_round2_fixes.py` | "yes" no longer hijacks pending qualification questions, garbage addresses get re-asked not booked, custom-pricing escalates even mid-objection, address is correctable after booking |
+| `test_review_round3_fixes.py` | Booking-confirm flag can't go stale across turns, post-booking address-shaped chatter needs an explicit correction cue |
 
 ### Run results
 
 ```
-51 passed in 0.09s
+54 passed in 0.09s
 ```
 
 All tests pass. Nothing is currently failing or skipped.
