@@ -2,7 +2,7 @@
 
 A production-oriented commercial-roofing sales agent for **Carriere
 Roofing** (Edmonton, AB — 20 years SBS / torch-on experience,
-780-405-4440). The agent's job, in order, is:
+587-557-7138). The agent's job, in order, is:
 
 **ANSWER → QUALIFY → BOOK INSPECTION.**
 
@@ -128,7 +128,7 @@ tests/         One file per conversation path (see below).
   returns a receipt describing what a real integration would need to do
   (e.g. post to a Slack channel, fire an SMS via Twilio). It does not
   page, text, or call anyone. The agent's reply only ever promises "he'll
-  follow up" or gives the real phone number (780-405-4440) — never "Danny
+  follow up" or gives the real phone number (587-557-7138) — never "Danny
   says" or "Danny confirmed."
 
 To wire this to a real system: implement `EventSink` (or replace the tool

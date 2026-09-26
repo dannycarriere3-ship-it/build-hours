@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 COMPANY_NAME = "Carriere Roofing"
 COMPANY_CITY = "Edmonton, Alberta"
-COMPANY_PHONE = "780-405-4440"
+COMPANY_PHONE = "587-557-7138"
 COMPANY_EXPERIENCE = "20 years SBS / torch-on experience"
 
 ESCALATION_CONTACT_NAME = "Danny"
