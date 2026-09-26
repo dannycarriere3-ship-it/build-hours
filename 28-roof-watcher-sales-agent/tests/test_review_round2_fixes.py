@@ -4,7 +4,7 @@ One test per bug, each reproducing the exact repro from the review before
 asserting the fixed behavior.
 """
 
-from roof_watcher.config import ADDRESS_CLARIFICATION
+from roof_watcher.config import ADDRESS_CLARIFICATION, COMPANY_PHONE
 
 
 # --- Bug 1: "yes" hijacked mid-qualification answers ----------------------
@@ -70,7 +70,7 @@ def test_custom_pricing_ask_escalates_even_during_objection_followup(agent):
 
     assert agent.state.escalation.escalated is True
     assert agent.state.escalation.triggered_rule == 2
-    assert "780-405-4440" in reply
+    assert COMPANY_PHONE in reply
 
 
 # --- Bug 4: address can't be corrected after booking -----------------------

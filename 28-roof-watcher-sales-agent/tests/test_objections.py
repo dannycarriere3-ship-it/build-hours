@@ -1,4 +1,4 @@
-from roof_watcher.config import CALL_BACK_PROMPT, THINK_ABOUT_IT_PROMPT
+from roof_watcher.config import CALL_BACK_PROMPT, COMPANY_PHONE, THINK_ABOUT_IT_PROMPT
 
 
 def test_think_about_it_prompts_for_the_specific_concern(agent):
@@ -20,7 +20,7 @@ def test_think_about_it_then_refusing_to_explain_escalates(agent):
     reply = agent.send("I don't know.")
     assert agent.state.escalation.escalated is True
     assert agent.state.escalation.triggered_rule == 1
-    assert "780-405-4440" in reply
+    assert COMPANY_PHONE in reply
 
 
 def test_call_back_prompts_for_blocker_first(agent):
