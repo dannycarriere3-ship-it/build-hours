@@ -2228,6 +2228,13 @@ func _input(event: InputEvent) -> void:
             var end_point := _design_point(event.position)
             var delta_touch := end_point - touch_start
             touch_active = false
+            if PAUSE_BOX.has_point(end_point) and abs(delta_touch.x) <= 70.0 and abs(delta_touch.y) <= 70.0:
+                paused = not paused
+                return
+            # Gameplay must stay frozen while paused -- only the pause-box tap
+            # above (handled first) may act on a touch event past this point.
+            if paused:
+                return
             if phase == "BREACH" and gate_open and abs(delta_touch.x) <= 70.0 and abs(delta_touch.y) <= 70.0:
                 if GATE_BOXES[0].has_point(end_point):
                     _choose_gate(0)
@@ -2235,9 +2242,6 @@ func _input(event: InputEvent) -> void:
                 elif GATE_BOXES[1].has_point(end_point):
                     _choose_gate(1)
                     return
-            if PAUSE_BOX.has_point(end_point) and abs(delta_touch.x) <= 70.0 and abs(delta_touch.y) <= 70.0:
-                paused = not paused
-                return
             if phase == "BREACH" and abs(delta_touch.x) > 45.0 and abs(delta_touch.x) > abs(delta_touch.y):
                 if delta_touch.x < 0:
                     player_lane = max(0, player_lane - 1)
@@ -2262,6 +2266,10 @@ func _input(event: InputEvent) -> void:
         _touch_juice(p)
         if PAUSE_BOX.has_point(p):
             paused = not paused
+            return
+        # Gameplay must stay frozen while paused -- only the pause-box click
+        # above (handled first) may act on a mouse event past this point.
+        if paused:
             return
         if gate_open:
             if GATE_BOXES[0].has_point(p):
