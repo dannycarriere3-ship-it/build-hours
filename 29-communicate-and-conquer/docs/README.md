@@ -38,3 +38,7 @@ This is not device proof. Device proof requires a built APK and measurements on 
 ## Truth discipline
 
 Implemented/static checks are not represented as runtime or device proof. See `BUILD_STATUS.md`.
+
+## CI
+
+`tests/verify_static.py`, `verify_pipeline.py`, `verify_automated.py`, and `verify_v2.py` run automatically on every push to `main` and every PR that touches this folder (`.github/workflows/communicate-and-conquer.yml`). They're stdlib-only static/text checks — no Godot install required.
