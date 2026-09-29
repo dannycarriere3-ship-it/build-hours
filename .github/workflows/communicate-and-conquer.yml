@@ -1,0 +1,40 @@
+name: Communicate & Conquer — verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "29-communicate-and-conquer/**"
+      - ".github/workflows/communicate-and-conquer.yml"
+  pull_request:
+    paths:
+      - "29-communicate-and-conquer/**"
+      - ".github/workflows/communicate-and-conquer.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 29-communicate-and-conquer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # Static/text-level contract checks bundled with the project. Pure
+      # stdlib, no Godot install required -- they check the .gd/.cfg source
+      # against known-good tokens and known regressions, not runtime behavior.
+      - name: verify_static.py
+        run: python3 tests/verify_static.py
+
+      - name: verify_pipeline.py
+        run: python3 tests/verify_pipeline.py
+
+      - name: verify_automated.py
+        run: python3 tests/verify_automated.py
+
+      - name: verify_v2.py
+        run: python3 tests/verify_v2.py
