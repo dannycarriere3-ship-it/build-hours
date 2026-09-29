@@ -1,0 +1,32 @@
+; Communicate & Conquer — Maximum Vertical Slice
+; Godot 4.x
+config_version=5
+
+[application]
+config/name="Communicate & Conquer"
+config/version="2.0"
+run/main_scene="res://Main.tscn"
+config/icon="res://icon.png"
+config/features=PackedStringArray("4.3", "Mobile")
+
+[display]
+window/size/viewport_width=2560
+window/size/viewport_height=1440
+window/size/window_width_override=2560
+window/size/window_height_override=1440
+window/stretch/aspect="expand"
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+display/window/vsync/vsync_mode=1
+
+[rendering]
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+anti_aliasing/quality/msaa_2d=2
+anti_aliasing/quality/msaa_3d=2
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.025, 0.035, 0.05, 1)
+
+[layer_names]
+2d_physics/layer_1="world"
