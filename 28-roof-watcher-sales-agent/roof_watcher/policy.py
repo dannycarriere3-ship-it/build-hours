@@ -16,18 +16,31 @@ from roof_watcher import tools
 from roof_watcher.config import (
     ADDRESS_CLARIFICATION,
     CALL_BACK_PROMPT,
+    COMPANY_NAME,
     COMPANY_PHONE,
+    CONTACT_CLARIFICATION,
+    CONTACT_QUESTION,
     ESCALATION_CONTACT_NAME,
     EXPERIENCE_ANSWER,
+    FREE_INSPECTION_ANSWER,
+    INSPECTION_LINE,
+    INSPECTION_PRICE_ANSWER,
+    PLANS,
     PRICING_QNA_ANSWER,
     PRIMARY_CTA,
     REPAIR_COST_ANSWER,
     REPAIR_COST_FOLLOWUP,
+    ROOF_SYSTEMS_ANSWER,
     THINK_ABOUT_IT_PROMPT,
-    TIERS,
 )
 from roof_watcher.models import ConversationState, Role, Stage
-from roof_watcher.nlu import Classification, classify, is_negative_leak_status, parse_yesno
+from roof_watcher.nlu import (
+    Classification,
+    classify,
+    extract_contact_name,
+    is_negative_leak_status,
+    parse_yesno,
+)
 from roof_watcher.tools import EventSink
 
 _LEAK_DETAILS_QUESTION = (
@@ -59,7 +72,16 @@ def handle_message(state: ConversationState, sink: EventSink, text: str) -> str:
 def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
     cls = classify(text)
 
+    # Opportunistic: a phone number volunteered at any point is kept, so we
+    # never ask for something the customer already gave us.
+    if cls.phone and state.qualification.contact_phone is None:
+        state.qualification.contact_phone = cls.phone
+        if state.qualification.contact_name is None:
+            state.qualification.contact_name = extract_contact_name(text)
+
     if state.escalation.escalated:
+        if state.qualification.awaiting_contact:
+            return _handle_contact_reply(state, sink, text, cls, escalated=True)
         return _escalated_reply()
 
     # Consumed exactly once, every turn: awaiting_booking_confirm is only
@@ -83,6 +105,8 @@ def _handle(state: ConversationState, sink: EventSink, text: str) -> str:
         # would corrupt a correct booking and log a bogus correction.
         if cls.address_like is not None and _CORRECTION_CUE_RE.search(text):
             return _handle_address_correction(state, sink, cls.address_like)
+        if state.qualification.awaiting_contact:
+            return _handle_contact_reply(state, sink, text, cls, escalated=False)
         return _booked_reply(state)
 
     # ---- Escalation rule 2: custom pricing / payment plan request. Checked
@@ -244,11 +268,20 @@ def _pipeline(
 def _answer_for_intent(cls: Classification) -> str:
     if cls.intent == "pricing_question":
         return PRICING_QNA_ANSWER
+    if cls.intent == "inspection_price_question":
+        return INSPECTION_PRICE_ANSWER
+    if cls.intent == "free_inspection_question":
+        return FREE_INSPECTION_ANSWER
+    if cls.intent == "roof_systems_question":
+        return ROOF_SYSTEMS_ANSWER
     if cls.intent == "repair_cost_question":
         return f"{REPAIR_COST_ANSWER} {REPAIR_COST_FOLLOWUP}"
     if cls.intent == "tier_question" and cls.tier_key:
-        tier = TIERS[cls.tier_key]
-        return f"{tier.name} is ${tier.monthly_price_usd}/month. {tier.description}"
+        plan = PLANS[cls.tier_key]
+        return (
+            f"The {plan.name} maintenance plan is ${plan.monthly_price_cad}/month "
+            "plus GST. Repairs are quoted separately after inspection."
+        )
     if cls.intent == "experience_question":
         return EXPERIENCE_ANSWER
     return ""
@@ -284,6 +317,9 @@ def _qualification_followup(state: ConversationState) -> str:
 # these, so the question gets re-asked after the new thing is answered.
 _DEFLECTING_INTENTS = {
     "pricing_question",
+    "inspection_price_question",
+    "free_inspection_question",
+    "roof_systems_question",
     "repair_cost_question",
     "tier_question",
     "experience_question",
@@ -356,16 +392,84 @@ def _extract_qualification(
 
 
 def _do_booking(state: ConversationState, sink: EventSink) -> str:
-    address = state.qualification.address
-    receipt = tools.book_inspection(sink, address)
+    q = state.qualification
+    address = q.address
+    receipt = tools.book_inspection(
+        sink,
+        address,
+        contact_name=q.contact_name,
+        contact_phone=q.contact_phone,
+        summary=_qualification_summary(state),
+    )
     state.booking.requested = True
     state.booking.address = address
     state.booking.request_reference = receipt["reference"]
     state.stage = Stage.BOOKED
-    return (
+    logged = (
         f"Got it — inspection request logged for {address} "
-        f"(ref: {receipt['reference']}). Someone from Carriere Roofing will "
-        "call to confirm timing. Anything else?"
+        f"(ref: {receipt['reference']}). {INSPECTION_LINE}"
+    )
+    if q.contact_phone:
+        return (
+            f"{logged} Someone from {COMPANY_NAME} will call you at "
+            f"{q.contact_phone} to confirm timing. You can also reach "
+            f"{ESCALATION_CONTACT_NAME} directly at {COMPANY_PHONE}. Anything else?"
+        )
+    q.awaiting_contact = True
+    return f"{logged} {CONTACT_QUESTION}"
+
+
+def _qualification_summary(state: ConversationState) -> dict:
+    q = state.qualification
+    return {
+        "issue_description": q.issue_description,
+        "is_leaking": q.is_leaking,
+        "leak_location": q.leak_location,
+        "leak_active": q.leak_active,
+        "is_multiple_properties": q.is_multiple_properties,
+        "role": q.role.value if q.role else None,
+    }
+
+
+def _handle_contact_reply(
+    state: ConversationState,
+    sink: EventSink,
+    text: str,
+    cls: Classification,
+    escalated: bool,
+) -> str:
+    q = state.qualification
+    if cls.phone is None:
+        # A custom-pricing ask or a question still gets its normal handling
+        # path elsewhere; here we just re-ask once, then let it go.
+        if q.contact_reasks < 1:
+            q.contact_reasks += 1
+            return CONTACT_CLARIFICATION
+        q.awaiting_contact = False
+        return _escalated_reply() if escalated else _booked_reply(state)
+
+    q.awaiting_contact = False
+    q.contact_phone = cls.phone
+    name = extract_contact_name(text)
+    if name:
+        q.contact_name = name
+    tools.record_contact(
+        sink,
+        reference=state.booking.request_reference,
+        contact_name=q.contact_name,
+        contact_phone=q.contact_phone,
+        escalated=escalated,
+    )
+    thanks = f"Thanks, {q.contact_name}" if q.contact_name else "Thanks"
+    if escalated:
+        return (
+            f"{thanks} — {ESCALATION_CONTACT_NAME} will call you at "
+            f"{q.contact_phone}. You can also reach him directly at {COMPANY_PHONE}."
+        )
+    return (
+        f"{thanks} — we'll call you at {q.contact_phone} to confirm timing. "
+        f"You can also reach {ESCALATION_CONTACT_NAME} directly at "
+        f"{COMPANY_PHONE}. Anything else?"
     )
 
 
@@ -387,21 +491,39 @@ def _booked_reply(state: ConversationState) -> str:
     ref = state.booking.request_reference
     return (
         f"You're already booked (ref: {ref}) — our team will call to confirm "
-        f"timing. Need anything else, or want to reach us directly at "
-        f"{COMPANY_PHONE}?"
+        f"timing. Need anything else, or want to reach "
+        f"{ESCALATION_CONTACT_NAME} directly at {COMPANY_PHONE}?"
     )
 
 
 def _escalate(state: ConversationState, sink: EventSink, rule: int, reason: str) -> str:
+    q = state.qualification
     state.escalation.escalated = True
     state.escalation.reason = reason
     state.escalation.triggered_rule = rule
     state.stage = Stage.ESCALATED
-    tools.escalate_to_danny(sink, reason=reason, rule=rule)
-    return (
+    tools.escalate_to_danny(
+        sink,
+        reason=reason,
+        rule=rule,
+        contact_name=q.contact_name,
+        contact_phone=q.contact_phone,
+        address=q.address,
+        transcript=[f"{t.speaker}: {t.text}" for t in state.history],
+    )
+    intro = (
         f"Understood — let me bring {ESCALATION_CONTACT_NAME} in personally "
-        f"so he can help directly. He'll follow up, or you can reach him "
-        f"now at {COMPANY_PHONE}."
+        "so he can help directly."
+    )
+    if q.contact_phone:
+        return (
+            f"{intro} He'll call you at {q.contact_phone}, or you can reach "
+            f"him now at {COMPANY_PHONE}."
+        )
+    q.awaiting_contact = True
+    return (
+        f"{intro} What's the best number for him to reach you? You can also "
+        f"reach him now at {COMPANY_PHONE}."
     )
 
 
