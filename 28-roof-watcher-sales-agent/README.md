@@ -1,14 +1,28 @@
-# Roof Watcher Sales Agent — Carriere Roofing
+# Roof Watcher Sales Agent — Carriere Flat Roofing
 
-A production-oriented commercial-roofing sales agent for **Carriere
-Roofing** (Edmonton, AB — 20 years SBS / torch-on experience,
-587-557-7138). The agent's job, in order, is:
+A production-oriented commercial-roofing sales agent for **Carriere Flat
+Roofing** (Edmonton, AB — 20 years in commercial flat roofing: SBS, TPO,
+EPDM and BUR — 780-405-4440). The agent's job, in order, is:
 
 **ANSWER → QUALIFY → BOOK INSPECTION.**
 
 It answers the customer's question, gathers the five qualification facts
-one at a time, and gets a building address so an inspection can be
-requested — escalating to Danny only under four narrowly-defined rules.
+one at a time, gets a building address so an inspection can be requested,
+then takes the customer's name and callback number — escalating to Danny
+only under four narrowly-defined rules. It gives customers Danny's number
+(780-405-4440) after booking and on every hand-off.
+
+## What it says (all in `roof_watcher/config.py`)
+
+| Question | Answer |
+|---|---|
+| "What do you charge?" | Maintenance plans $167/month (Essential), $333/month (Professional), $542/month (Premium Platinum), plus GST. Roof inspection $500 per roof. Repairs quoted after inspection. |
+| "How much is an inspection?" | $500 per roof — dated photos + written condition report to ARCA standards. Infrared inspection $700–$1,000, charged separately. |
+| "Is the inspection free?" | States the $500 price. Never offers a free inspection. |
+| "Do you do TPO / EPDM / ...?" | Yes — all four systems: SBS, TPO, EPDM and BUR. |
+| "How much will the repair cost?" | Inspect first, then quote. Never a repair price. |
+
+All prices are Canadian dollars.
 
 ## Why this is built as a deterministic policy, not an LLM prompt
 
@@ -74,8 +88,9 @@ print(agent.send("We manage 3 buildings"))
 ```
 roof_watcher/
   config.py    Business facts + the exact scripted lines (pricing Q&A,
-               tier Q&A, objection prompts, primary CTA). Nothing outside
-               this file is a source of truth for what the agent claims.
+               plan Q&A, inspection price, roof systems, objection prompts,
+               primary CTA). Nothing outside this file is a source of
+               truth for what the agent claims.
   models.py    ConversationState: QualificationState, EscalationState,
                BookingState, Stage. Explicit, testable state — no hidden
                context.
@@ -87,7 +102,10 @@ roof_watcher/
                dataclass it returns.
   policy.py    The ANSWER -> QUALIFY -> BOOK state machine + the four
                escalation rules. Single entry point: handle_message(...).
-  tools.py     SIMULATED side effects only — see below.
+  tools.py     Side effects (booking, contact, escalation) — simulated
+               unless a real sink is passed in. See below.
+  pipedrive.py Optional PipedriveSink: sends bookings and hand-offs to
+               Pipedrive when PIPEDRIVE_API_TOKEN is set.
   agent.py     RoofWatcherAgent: owns one conversation's state + event
                sink. This is the object you actually use.
   cli.py       Interactive terminal demo (python -m roof_watcher.cli).
@@ -112,9 +130,38 @@ tests/         One file per conversation path (see below).
 - **`BookingState`** — `requested` (bool), `address`, `request_reference`.
   That's it — no fake time slot.
 
+## Pipedrive (optional, off by default)
+
+Set these and run the CLI (or pass `PipedriveSink.from_env()` as the
+agent's `sink`):
+
+```bash
+export PIPEDRIVE_API_TOKEN=...                    # Pipedrive > Personal preferences > API
+export PIPEDRIVE_DOMAIN=carriereflatroofingcom    # from <domain>.pipedrive.com
+# optional: the stage is found by its name "Inspection Booked" automatically
+# export PIPEDRIVE_STAGE_ID_INSPECTION_BOOKED=...
+python3 -m roof_watcher.cli
+```
+
+- A booked inspection becomes a deal "Inspection — <address>" worth
+  CA$500 in the Inspection Booked stage, with a note holding the
+  qualification answers and "Timing NOT confirmed".
+- The customer's name and number become a person linked to that deal.
+- A hand-off to Danny becomes a "call" activity with the reason, the
+  customer's number and the full transcript.
+- It only writes to the CRM. It never emails or texts anyone. A failed
+  API call is logged in `sink.errors` and the conversation carries on.
+- The token is sent in the `x-api-token` header, never in the URL.
+- A caller whose phone is already a person in Pipedrive is reused, not
+  created again (the account already holds ~691 people).
+- A number given after a hand-off is attached to Danny's call-back activity.
+- Tested against a fake Pipedrive (`tests/test_pipedrive_sink.py`), not
+  yet against the live account.
+
 ## Simulated vs. real — read this before using in production
 
-**Nothing here talks to a real calendar, CRM, or paging system.**
+**Without the Pipedrive sink, nothing here talks to a real calendar,
+CRM, or paging system.**
 `roof_watcher/tools.py` defines an `EventSink` protocol and an
 `InMemorySink` default implementation that just appends dicts to a list.
 
@@ -128,8 +175,8 @@ tests/         One file per conversation path (see below).
   returns a receipt describing what a real integration would need to do
   (e.g. post to a Slack channel, fire an SMS via Twilio). It does not
   page, text, or call anyone. The agent's reply only ever promises "he'll
-  follow up" or gives the real phone number (587-557-7138) — never "Danny
-  says" or "Danny confirmed."
+  follow up", asks for the customer's number, and gives Danny's real
+  number (780-405-4440) — never "Danny says" or "Danny confirmed."
 
 To wire this to a real system: implement `EventSink` (or replace the tool
 bodies) to call your scheduling API / paging system, and pass that
@@ -158,12 +205,17 @@ python3 -m pip install -e ".[dev]"
 pytest -q
 ```
 
-54 tests, one file per major conversation path:
+82 tests, one file per major conversation path. They run automatically
+on every push and pull request that touches this folder
+(`.github/workflows/roof-watcher-sales-agent.yml`).
 
 | File | Covers |
 |---|---|
 | `test_pricing_qna.py` | Exact scripted pricing answer; experience Q&A |
-| `test_tier_qna.py` | Roof Watcher / Watcher / Platinum — real prices, one question per turn |
+| `test_tier_qna.py` | Essential / Professional / Premium Platinum — real monthly CAD prices + GST, one question per turn |
+| `test_business_facts.py` | Name, phone, $500 inspection (never free), infrared price, all four roof systems, no stale facts in source |
+| `test_contact_capture.py` | Callback name/number after booking and hand-off, one re-ask max, Danny's number given |
+| `test_pipedrive_sink.py` | Deal/person/note/activity calls against a fake Pipedrive, stage found by name, no duplicate people, token kept out of URLs, failures don't break the chat |
 | `test_qualification_flow.py` | Full 5-question qualification order, pricing-answer short-circuit |
 | `test_leak_flow.py` | Active-leak urgent path, no diagnosis/price language |
 | `test_objections.py` | "Think about it" (explain vs. refuse), "call you back" (once vs. repeated), repair-cost-then-yes |
@@ -176,7 +228,7 @@ pytest -q
 ### Run results
 
 ```
-54 passed in 0.09s
+82 passed in 0.18s
 ```
 
 All tests pass. Nothing is currently failing or skipped.

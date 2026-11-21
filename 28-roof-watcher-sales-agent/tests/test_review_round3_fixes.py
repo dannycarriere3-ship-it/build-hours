@@ -34,6 +34,7 @@ def test_address_shaped_chatter_after_booking_does_not_overwrite_address(agent):
     agent.send("My roof is leaking.")
     agent.send("Back corner, actively dripping.")
     agent.send("456 Industrial Ave, Edmonton")
+    agent.send("Bob, 780-555-0100")
     assert agent.state.booking.requested is True
     original_address = agent.state.booking.address
     original_reference = agent.state.booking.request_reference

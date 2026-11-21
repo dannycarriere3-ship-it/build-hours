@@ -2,6 +2,8 @@
 criteria: leak, maintenance/general question, pricing question, general
 inquiry. Each should reach ANSWER -> QUALIFY -> BOOK without escalating."""
 
+import re
+
 import pytest
 
 from roof_watcher.agent import RoofWatcherAgent
@@ -77,4 +79,7 @@ def test_no_escalation_and_no_repair_price_ever_quoted(messages):
     a = _run(*messages)
     full_transcript = " ".join(turn.text for turn in a.state.history if turn.speaker == "agent")
     assert a.state.escalation.escalated is False
-    assert "$" not in full_transcript or "month" in full_transcript
+    # The only dollar figures allowed are the scripted plan prices and the
+    # fixed $500 inspection price -- never a repair price.
+    allowed = re.compile(r"\$(167|333|542)/month|\$500 per roof")
+    assert "$" not in allowed.sub("", full_transcript)

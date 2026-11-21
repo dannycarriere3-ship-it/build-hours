@@ -26,7 +26,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
-from roof_watcher.config import COMPANY_NAME, COMPANY_PHONE, ESCALATION_CONTACT_NAME
+from roof_watcher.config import (
+    COMPANY_NAME,
+    COMPANY_PHONE,
+    ESCALATION_CONTACT_NAME,
+    INSPECTION_PRICE_CAD,
+)
 
 
 class EventSink(Protocol):
@@ -49,7 +54,13 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def book_inspection(sink: EventSink, address: str) -> dict:
+def book_inspection(
+    sink: EventSink,
+    address: str,
+    contact_name: str | None = None,
+    contact_phone: str | None = None,
+    summary: dict | None = None,
+) -> dict:
     """Log a simulated inspection request. Does NOT confirm a real time.
 
     Returns a receipt with a local reference number the agent can quote
@@ -61,6 +72,10 @@ def book_inspection(sink: EventSink, address: str) -> dict:
     payload = {
         "reference": reference,
         "address": address,
+        "contact_name": contact_name,
+        "contact_phone": contact_phone,
+        "qualification": summary or {},
+        "inspection_price_cad": INSPECTION_PRICE_CAD,
         "requested_at": _now(),
         "company": COMPANY_NAME,
         "status": "pending_human_confirmation",
@@ -69,7 +84,15 @@ def book_inspection(sink: EventSink, address: str) -> dict:
     return payload
 
 
-def escalate_to_danny(sink: EventSink, reason: str, rule: int) -> dict:
+def escalate_to_danny(
+    sink: EventSink,
+    reason: str,
+    rule: int,
+    contact_name: str | None = None,
+    contact_phone: str | None = None,
+    address: str | None = None,
+    transcript: list[str] | None = None,
+) -> dict:
     """Log a simulated escalation. Does NOT actually page/text/call anyone.
 
     Returns a receipt describing what would need to happen in a real
@@ -82,6 +105,10 @@ def escalate_to_danny(sink: EventSink, reason: str, rule: int) -> dict:
         "rule": rule,
         "escalated_at": _now(),
         "callback_number": COMPANY_PHONE,
+        "contact_name": contact_name,
+        "contact_phone": contact_phone,
+        "address": address,
+        "transcript": transcript or [],
         "status": "logged_pending_human_notification",
     }
     sink.record("escalation", payload)
@@ -107,10 +134,30 @@ def correct_booking_address(
     return payload
 
 
+def record_contact(
+    sink: EventSink,
+    reference: str | None,
+    contact_name: str | None,
+    contact_phone: str,
+    escalated: bool,
+) -> dict:
+    """Log the customer's callback name/number against a booking (by
+    reference) or an escalation. Simulated unless the sink is real."""
+    payload = {
+        "reference": reference,
+        "contact_name": contact_name,
+        "contact_phone": contact_phone,
+        "escalated": escalated,
+        "recorded_at": _now(),
+    }
+    sink.record("contact", payload)
+    return payload
+
+
 def get_pricing_snapshot() -> dict:
     """Read-only lookup of the real, static pricing config (not a network
     call — just exposed as a tool for symmetry with the other two, and so
     a future LLM-tool-calling wrapper could call it directly)."""
-    from roof_watcher.config import TIERS
+    from roof_watcher.config import PLANS
 
-    return {key: tier.__dict__ for key, tier in TIERS.items()}
+    return {key: plan.__dict__ for key, plan in PLANS.items()}

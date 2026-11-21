@@ -9,3 +9,6 @@ __pycache__/
 11-recommendation/images
 
 .venv/
+
+*.egg-info/
+.pytest_cache/
