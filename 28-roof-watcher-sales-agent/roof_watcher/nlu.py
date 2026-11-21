@@ -23,11 +23,50 @@ _PRICING_RE = re.compile(
     r"\b(what.*(charge|cost)|how much|price|pricing|rates?|fees?)\b", re.I
 )
 
+# Maintenance plans. "Premium Platinum" is checked as "platinum" so either
+# wording works; "essential"/"professional" need plan context so ordinary
+# prose ("it's essential we fix this", "a professional crew") isn't read
+# as a plan question.
 _TIER_PATTERNS: dict[str, re.Pattern[str]] = {
-    "roof_watcher": re.compile(r"\broof\s*watcher\b", re.I),
-    "watcher": re.compile(r"\bwatcher\b", re.I),
-    "platinum": re.compile(r"\bplatinum\b", re.I),
+    "premium_platinum": re.compile(r"\b(premium\s+)?platinum\b", re.I),
+    "essential": re.compile(r"\bessential\s+(plan|tier|package|maintenance)\b|"
+                            r"\b(the|your)\s+essential\b|^\s*essential\s*\??\s*$", re.I),
+    "professional": re.compile(r"\bprofessional\s+(plan|tier|package|maintenance)\b|"
+                               r"\b(the|your)\s+professional\s+(plan|tier|package|one)\b|"
+                               r"^\s*professional\s*\??\s*$", re.I),
 }
+
+_INSPECTION_PRICE_RE = re.compile(
+    r"\binspect\w*.{0,40}\b(cost|price|charge|much|fee)\b|"
+    r"\b(cost|price|charge|much|fee)\b.{0,40}\binspect\w*",
+    re.I,
+)
+_FREE_INSPECTION_RE = re.compile(
+    r"\bfree\b.{0,25}\b(inspection|estimate|quote|assessment)s?\b|"
+    r"\b(inspection|estimate|quote|assessment)s?\b.{0,25}\bfree\b",
+    re.I,
+)
+_ROOF_SYSTEM_WORD_RE = re.compile(
+    r"\b(tpo|epdm|bur|sbs|torch[- ]?on|built[- ]up|modified bitumen|rubber roofs?)\b",
+    re.I,
+)
+_QUESTION_CUE_RE = re.compile(r"\?|\b(do|can|does|will) you\b|\bwhat\b|\bwhich\b", re.I)
+_ROOF_SYSTEMS_GENERIC_RE = re.compile(
+    r"\b(what|which) (kinds?|types?|systems?) of (roofs?|roofing|systems?)\b|"
+    r"\bwhat (roof(ing)? )?systems\b",
+    re.I,
+)
+
+# North American phone number: 780-405-4440, (780) 405 4440, 7804054440,
+# +1 780.405.4440.
+_PHONE_RE = re.compile(
+    r"(?<!\d)(?:\+?1[\s.-]?)?\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})(?!\d)"
+)
+_NAME_FILLER_RE = re.compile(
+    r"\b(my name is|name'?s|this is|it'?s|i'?m|im|call|me|at|on|reach|you can|"
+    r"can|the|best|number|phone|cell|is|and|or|text|ask for|my|for)\b",
+    re.I,
+)
 
 _EXPERIENCE_RE = re.compile(
     r"\b(how (long|experienced)|years? (of )?experience|been in business|"
@@ -107,6 +146,31 @@ _NO_RE = re.compile(
 )
 
 
+def extract_phone(text: str) -> str | None:
+    """Return a normalized NNN-NNN-NNNN phone number, or None."""
+    m = _PHONE_RE.search(text)
+    if not m:
+        return None
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+
+def extract_contact_name(text: str) -> str | None:
+    """Best-effort name from a "name + number" reply, e.g. "Bob, 780-555-0100".
+
+    Returns None rather than guessing when what's left doesn't look like a
+    short name.
+    """
+    stripped = _PHONE_RE.sub(" ", text)
+    stripped = _NAME_FILLER_RE.sub(" ", stripped)
+    stripped = re.sub(r"[^A-Za-z' -]", " ", stripped)
+    words = [w for w in stripped.split() if w.strip("'-")]
+    if not 1 <= len(words) <= 4:
+        return None
+    if not all(w[0].isalpha() for w in words):
+        return None
+    return " ".join(w.capitalize() if w.islower() else w for w in words)
+
+
 def is_negative_leak_status(text: str) -> bool:
     """True if the text reads as "not leaking (anymore)"."""
     return bool(_ACTIVE_LEAK_NO_RE.search(text))
@@ -171,6 +235,7 @@ class Classification:
     low_engagement: bool = False
     refuses_to_explain: bool = False
     is_greeting: bool = False
+    phone: str | None = None
     extra_intents: list[str] = field(default_factory=list)
 
 
@@ -210,6 +275,10 @@ def classify(text: str) -> Classification:
     # "pricing" and "leak"-adjacent language, so it's checked first.
     if _REPAIR_COST_RE.search(text):
         intent = "repair_cost_question"
+    elif _FREE_INSPECTION_RE.search(text):
+        intent = "free_inspection_question"
+    elif _INSPECTION_PRICE_RE.search(text):
+        intent = "inspection_price_question"
     elif _EXPERIENCE_RE.search(text):
         intent = "experience_question"
     elif _CUSTOM_PRICING_RE.search(text):
@@ -220,6 +289,10 @@ def classify(text: str) -> Classification:
         intent = "think_about_it"
     elif tier_key is not None:
         intent = "tier_question"
+    elif _ROOF_SYSTEMS_GENERIC_RE.search(text) or (
+        _ROOF_SYSTEM_WORD_RE.search(text) and _QUESTION_CUE_RE.search(text)
+    ):
+        intent = "roof_systems_question"
     elif _PRICING_RE.search(text):
         intent = "pricing_question"
     elif is_leaking:
@@ -244,5 +317,6 @@ def classify(text: str) -> Classification:
         low_engagement=low_engagement,
         refuses_to_explain=refuses_to_explain,
         is_greeting=bool(_GREETING_RE.match(text)),
+        phone=extract_phone(text),
         extra_intents=extra,
     )

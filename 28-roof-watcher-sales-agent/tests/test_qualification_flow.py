@@ -28,7 +28,8 @@ def test_general_inquiry_walks_all_five_questions_in_order(agent):
     assert agent.state.booking.requested is True
     assert agent.state.booking.address == "123 Main Street, Edmonton AB"
     assert agent.state.stage == Stage.BOOKED
-    assert "Anything else?" in r6
+    assert "$500 per roof" in r6
+    assert r6.endswith("at what number?")
     # Never invents a confirmed appointment time/date.
     for word in ("tomorrow", "am", "pm", "monday", "tuesday", "wednesday"):
         assert word not in r6.lower()

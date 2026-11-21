@@ -1,7 +1,7 @@
 [project]
 name = "roof-watcher-sales-agent"
 version = "0.1.0"
-description = "Roof Watcher commercial roofing sales agent for Carriere Roofing (Edmonton, AB)."
+description = "Roof Watcher commercial roofing sales agent for Carriere Flat Roofing (Edmonton, AB)."
 requires-python = ">=3.10"
 dependencies = []
 

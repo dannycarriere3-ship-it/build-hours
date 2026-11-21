@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from roof_watcher.agent import RoofWatcherAgent
 from roof_watcher.config import COMPANY_NAME
+from roof_watcher.pipedrive import PipedriveSink
 
 _COLOR = {"blue": "34", "gray": "90", "green": "32"}
 
@@ -18,8 +19,13 @@ def _c(text: str, name: str) -> str:
 
 
 def main() -> None:
-    agent = RoofWatcherAgent()
+    sink = PipedriveSink.from_env()
+    agent = RoofWatcherAgent(sink=sink)
     print(_c(f"{COMPANY_NAME} — Roof Watcher Sales Agent (demo)", "gray"))
+    if sink is not None:
+        print(_c(f"Pipedrive ON: bookings go to {sink.domain}.pipedrive.com", "gray"))
+    else:
+        print(_c("Pipedrive OFF: events are only logged in memory", "gray"))
     print(_c("Type 'exit' to quit.\n", "gray"))
     while True:
         try:
@@ -39,6 +45,10 @@ def main() -> None:
         print(_c("\n[simulated events logged this session]", "gray"))
         for event in agent.events:
             print(_c(f"  {event}", "gray"))
+    if sink is not None and sink.errors:
+        print(_c("\n[Pipedrive errors]", "gray"))
+        for err in sink.errors:
+            print(_c(f"  {err}", "gray"))
 
 
 if __name__ == "__main__":

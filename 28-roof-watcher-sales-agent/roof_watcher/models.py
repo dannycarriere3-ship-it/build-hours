@@ -39,6 +39,11 @@ class QualificationState:
     is_multiple_properties: bool | None = None
     role: Role | None = None
     address: str | None = None
+    # Who to call back. Asked right after the inspection request is logged
+    # (or right after an escalation), and captured opportunistically if the
+    # customer volunteers a phone number earlier.
+    contact_name: str | None = None
+    contact_phone: str | None = None
 
     # Each "awaiting_*" flag is set the turn we ask that specific
     # qualification question, and cleared the turn we consume the answer.
@@ -56,6 +61,11 @@ class QualificationState:
     # yes/no qualification question (e.g. "Is it leaking right now?") --
     # only in this state does "yes" mean "go to the address ask".
     awaiting_booking_confirm: bool = False
+    # True after we've asked "Who should we call ... at what number?".
+    awaiting_contact: bool = False
+    # How many times we've re-asked for a phone number (we re-ask once,
+    # then stop so the conversation never loops).
+    contact_reasks: int = 0
 
     def is_complete(self) -> bool:
         return self.address is not None
