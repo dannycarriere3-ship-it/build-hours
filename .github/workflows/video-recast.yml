@@ -1,0 +1,26 @@
+name: Video Recast — tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "30-video-recast/**"
+      - ".github/workflows/video-recast.yml"
+  pull_request:
+    paths:
+      - "30-video-recast/**"
+      - ".github/workflows/video-recast.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 30-video-recast
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: pip install pytest
+      - run: pytest -q

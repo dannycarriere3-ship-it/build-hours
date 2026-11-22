@@ -1,0 +1,12 @@
+[project]
+name = "video-recast"
+version = "0.1.0"
+description = "Replace the person in a video with a reference image, using Wan2.2-Animate."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
